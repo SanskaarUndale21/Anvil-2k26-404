@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research Automation Agent</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+
+    header { padding: 24px 32px; border-bottom: 1px solid #222; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+    .badge { background: #1a1a2e; color: #7c6ff7; font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid #7c6ff730; }
+
+    main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+    .card { background: #141414; border: 1px solid #222; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .card h2 { font-size: 14px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+
+    input[type="text"], input[type="email"] {
+      width: 100%; background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 8px;
+      padding: 10px 14px; color: #e0e0e0; font-size: 14px; margin-bottom: 12px;
+    }
+    input:focus { outline: none; border-color: #7c6ff7; }
+
+    button {
+      background: #7c6ff7; color: #fff; border: none; border-radius: 8px;
+      padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #6a5fe0; }
+    button:disabled { background: #2a2a2a; color: #555; cursor: not-allowed; }
+
+    .pipeline { display: flex; gap: 0; margin-bottom: 24px; flex-wrap: wrap; }
+    .step {
+      flex: 1; min-width: 100px; text-align: center; padding: 12px 8px;
+      background: #141414; border: 1px solid #222; position: relative;
+      font-size: 12px; color: #555; transition: all 0.3s;
+    }
+    .step:not(:last-child)::after {
+      content: ''; position: absolute; right: -8px; top: 50%; transform: translateY(-50%);
+      border: 8px solid transparent; border-left-color: #222; z-index: 1;
+    }
+    .step.active { background: #1a1a2e; color: #7c6ff7; border-color: #7c6ff730; }
+    .step.done { background: #0d1a0d; color: #4caf50; border-color: #4caf5030; }
+    .step.error { background: #1a0d0d; color: #f44336; border-color: #f4433630; }
+    .step-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+    .step-name { font-weight: 600; }
+
+    #log-container {
+      background: #0d0d0d; border-radius: 8px; border: 1px solid #1a1a1a;
+      height: 200px; overflow-y: auto; padding: 12px; font-family: monospace; font-size: 12px;
+    }
+    .log-line { padding: 2px 0; color: #888; }
+    .log-line.info { color: #7c6ff7; }
+    .log-line.success { color: #4caf50; }
+    .log-line.error { color: #f44336; }
+
+    #report-container { display: none; }
+    #report-content {
+      background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 8px;
+      padding: 20px; font-family: monospace; font-size: 13px; line-height: 1.6;
+      white-space: pre-wrap; max-height: 500px; overflow-y: auto; color: #c0c0c0;
+    }
+    .copy-btn { float: right; padding: 6px 14px; font-size: 12px; }
+
+    #status-bar { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+    #status-bar.queued { background: #1a1a0d; color: #ffc107; }
+    #status-bar.running { background: #1a1a2e; color: #7c6ff7; }
+    #status-bar.completed { background: #0d1a0d; color: #4caf50; }
+    #status-bar.failed { background: #1a0d0d; color: #f44336; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Research Automation Agent</h1>
+    <span class="badge">Multi-Agent Pipeline</span>
+    <span class="badge">PS3</span>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>New Research Task</h2>
+      <input type="text" id="query-input" placeholder="What do you want to research? e.g. 'Current state of LLM reasoning in 2025'" />
+      <input type="email" id="email-input" placeholder="Recipient email (optional)" />
+      <button id="submit-btn" onclick="submitResearch()">Run Research Pipeline</button>
+    </div>
+
+    <div class="pipeline" id="pipeline">
+      <div class="step" id="step-planner"><span class="step-icon">🧠</span><span class="step-name">Planner</span></div>
+      <div class="step" id="step-searcher"><span class="step-icon">🔍</span><span class="step-name">Searcher</span></div>
+      <div class="step" id="step-extractor"><span class="step-icon">⚗️</span><span class="step-name">Extractor</span></div>
+      <div class="step" id="step-synthesizer"><span class="step-icon">🔗</span><span class="step-name">Synthesizer</span></div>
+      <div class="step" id="step-writer"><span class="step-icon">✍️</span><span class="step-name">Writer</span></div>
+      <div class="step" id="step-delivery"><span class="step-icon">📬</span><span class="step-name">Delivery</span></div>
+    </div>
+
+    <div id="status-bar"></div>
+
+    <div class="card">
+      <h2>Live Agent Log</h2>
+      <div id="log-container"><div class="log-line" style="color:#444">Waiting for task...</div></div>
+    </div>
+
+    <div class="card" id="report-container">
+      <h2>Final Report <button class="copy-btn" onclick="copyReport()">Copy</button></h2>
+      <div id="report-content"></div>
+    </div>
+  </main>
+
+  <script>
+    const AGENT_ORDER = ['planner', 'searcher', 'extractor', 'synthesizer', 'writer', 'delivery'];
+    let currentTaskId = null;
+    let completedAgents = new Set();
+
+    function addLog(msg, cls = 'info') {
+      const el = document.getElementById('log-container');
+      const line = document.createElement('div');
+      line.className = `log-line ${cls}`;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.appendChild(line);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setStep(agent, state) {
+      const el = document.getElementById(`step-${agent}`);
+      if (!el) return;
+      el.className = `step ${state}`;
+    }
+
+    function setStatus(msg, state) {
+      const bar = document.getElementById('status-bar');
+      bar.style.display = 'block';
+      bar.textContent = msg;
+      bar.className = state;
+    }
+
+    function detectAgent(msg) {
+      const m = msg.match(/\[(Planner|Searcher|Extractor|Synthesizer|Writer|Delivery)\]/i);
+      return m ? m[1].toLowerCase() : null;
+    }
+
+    async function submitResearch() {
+      const query = document.getElementById('query-input').value.trim();
+      if (!query) { alert('Enter a research query.'); return; }
+
+      const email = document.getElementById('email-input').value.trim();
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Running...';
+
+      // Reset UI
+      document.getElementById('log-container').innerHTML = '';
+      document.getElementById('report-container').style.display = 'none';
+      AGENT_ORDER.forEach(a => setStep(a, ''));
+      completedAgents.clear();
+      setStatus('Queuing task...', 'queued');
+
+      const resp = await fetch('/webhook/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, recipient_email: email || null }),
+      });
+      const data = await resp.json();
+      currentTaskId = data.task_id;
+      addLog(`Task created: ${currentTaskId}`, 'info');
+      setStatus('Pipeline running...', 'running');
+
+      // Listen to SSE
+      const es = new EventSource(`/tasks/${currentTaskId}/stream`);
+      es.onmessage = (e) => {
+        const event = JSON.parse(e.data);
+
+        if (event.type === 'log') {
+          const msg = event.message;
+          addLog(msg, 'info');
+
+          const agent = detectAgent(msg);
+          if (agent) {
+            // Mark previous agents done
+            const idx = AGENT_ORDER.indexOf(agent);
+            AGENT_ORDER.slice(0, idx).forEach(a => { if (!completedAgents.has(a)) { setStep(a, 'done'); completedAgents.add(a); } });
+            setStep(agent, 'active');
+          }
+        }
+
+        if (event.type === 'completed') {
+          AGENT_ORDER.forEach(a => setStep(a, 'done'));
+          setStatus('Pipeline completed successfully', 'completed');
+          addLog('All agents done. Fetching report...', 'success');
+          fetchReport();
+          es.close();
+          btn.disabled = false;
+          btn.textContent = 'Run Research Pipeline';
+        }
+
+        if (event.type === 'error') {
+          setStatus(`Error: ${event.message}`, 'failed');
+          addLog(`Error: ${event.message}`, 'error');
+          es.close();
+          btn.disabled = false;
+          btn.textContent = 'Run Research Pipeline';
+        }
+
+        if (event.type === 'done' && event.status === 'failed') {
+          setStatus('Pipeline failed', 'failed');
+          es.close();
+          btn.disabled = false;
+          btn.textContent = 'Run Research Pipeline';
+        }
+      };
+    }
+
+    async function fetchReport() {
+      const resp = await fetch(`/tasks/${currentTaskId}`);
+      const task = await resp.json();
+      const report = task?.result?.final_report;
+      if (report) {
+        document.getElementById('report-container').style.display = 'block';
+        document.getElementById('report-content').textContent = report;
+      }
+    }
+
+    function copyReport() {
+      const text = document.getElementById('report-content').textContent;
+      navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+    }
+  </script>
+</body>
+</html>

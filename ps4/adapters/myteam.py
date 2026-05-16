@@ -57,8 +57,8 @@ _ROUTE_SIM  = 0.80
 _SMOOTH_A   = 0.15
 
 # ---- Aniso optimisation constants ----------------------------------------
-_BASE_OPT_STEPS = 80    # steps per restart at K=16, N=64 baseline
-_BASE_N_RAND    = 1     # random restarts at baseline
+_BASE_OPT_STEPS = 300   # steps per restart at K=16, N=64 baseline
+_BASE_N_RAND    = 3     # random restarts at baseline
 _OPT_LR         = 0.08  # mirror-descent learning rate
 
 
